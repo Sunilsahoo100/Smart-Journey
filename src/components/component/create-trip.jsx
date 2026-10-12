@@ -106,11 +106,13 @@ function CreateTrip() {
     try {
       const prompt = buildPrompt({ location: destination.label, days, traveler, budget, interests });
       const tripData = await generateTrip(prompt);
-      const id = `${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+      // Unguessable id: anyone with the link can view a trip (see firestore.rules).
+      const id = crypto.randomUUID();
       const { cloud } = await saveTrip({
         id,
         createdAt: Date.now(),
-        userEmail: user.email,
+        userId: user.uid,
+        userEmail: user.email ?? null,
         userSelection: {
           location: {
             label: destination.label,

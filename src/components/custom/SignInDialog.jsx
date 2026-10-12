@@ -1,64 +1,30 @@
 import { useState } from "react";
-import { useGoogleLogin } from "@react-oauth/google";
 import { FcGoogle } from "react-icons/fc";
 import { Loader2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { GOOGLE_CLIENT_ID, useAuth } from "@/context/AuthContext";
+import { isGoogleSignInAvailable, useAuth } from "@/context/AuthContext";
 import Logo from "./Logo";
 
-function GoogleSignInButton() {
-  const { signIn } = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  const login = useGoogleLogin({
-    onSuccess: async (token) => {
-      try {
-        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-          headers: { Authorization: `Bearer ${token.access_token}` },
-        });
-        if (!res.ok) throw new Error(`userinfo ${res.status}`);
-        const profile = await res.json();
-        signIn({ name: profile.name, email: profile.email, picture: profile.picture });
-        toast.success(`Welcome, ${profile.given_name ?? profile.name}!`);
-      } catch (error) {
-        console.error(error);
-        toast.error("Couldn't load your Google profile. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: (error) => {
-      console.error(error);
-      setLoading(false);
-      toast.error("Google sign-in failed.");
-    },
-    onNonOAuthError: () => setLoading(false), // popup closed or blocked
-  });
-
-  return (
-    <Button
-      size="lg"
-      variant="outline"
-      className="h-12 w-full gap-3 rounded-xl text-base"
-      disabled={loading}
-      onClick={() => {
-        setLoading(true);
-        login();
-      }}
-    >
-      {loading ? <Loader2 className="animate-spin" /> : <FcGoogle className="!h-5 !w-5" />}
-      Continue with Google
-    </Button>
-  );
-}
-
 function SignInDialog({ open, onOpenChange }) {
-  const { continueAsGuest } = useAuth();
+  const { signInWithGoogle, continueAsGuest } = useAuth();
+  const [pending, setPending] = useState(null);
+
+  const run = async (kind, action) => {
+    setPending(kind);
+    try {
+      const profile = await action();
+      if (profile && kind === "google") toast.success(`Welcome, ${profile.name.split(" ")[0]}!`);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setPending(null);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}>
       <DialogContent className="max-w-md rounded-2xl p-8">
         <DialogHeader className="items-center text-center sm:text-center">
           <Logo className="mb-4" />
@@ -69,18 +35,32 @@ function SignInDialog({ open, onOpenChange }) {
         </DialogHeader>
 
         <div className="mt-2 flex flex-col gap-3">
-          {GOOGLE_CLIENT_ID && <GoogleSignInButton />}
+          {isGoogleSignInAvailable && (
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-12 w-full gap-3 rounded-xl text-base"
+              disabled={Boolean(pending)}
+              onClick={() => run("google", signInWithGoogle)}
+            >
+              {pending === "google" ? <Loader2 className="animate-spin" /> : <FcGoogle className="!h-5 !w-5" />}
+              Continue with Google
+            </Button>
+          )}
           <Button
             size="lg"
-            variant={GOOGLE_CLIENT_ID ? "ghost" : "default"}
+            variant={isGoogleSignInAvailable ? "ghost" : "default"}
             className="h-12 w-full gap-3 rounded-xl text-base"
-            onClick={continueAsGuest}
+            disabled={Boolean(pending)}
+            onClick={() => run("guest", continueAsGuest)}
           >
-            <UserRound />
+            {pending === "guest" ? <Loader2 className="animate-spin" /> : <UserRound />}
             Continue as guest
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            Guest trips are saved in this browser only.
+            {isGoogleSignInAvailable
+              ? "Guest trips are tied to this browser. Sign in with Google later to keep them."
+              : "Guest trips are saved in this browser only."}
           </p>
         </div>
       </DialogContent>

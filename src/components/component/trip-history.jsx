@@ -22,27 +22,28 @@ function EmptyState({ icon: Icon, title, text, action }) {
 }
 
 function Mytrips() {
-  const { user, openSignIn } = useAuth();
+  const { user, ready, openSignIn } = useAuth();
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!ready) return;
     if (!user) {
       setLoading(false);
       return;
     }
     let active = true;
     setLoading(true);
-    getUserTrips(user.email)
+    getUserTrips(user)
       .then((result) => active && setTrips(result))
       .catch(() => toast.error("Couldn't load your trips."))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, ready]);
 
   const confirmDelete = async () => {
     setDeleting(true);
@@ -75,7 +76,7 @@ function Mytrips() {
         )}
       </div>
 
-      {!user ? (
+      {ready && !user ? (
         <EmptyState
           icon={LogIn}
           title="You're not signed in"

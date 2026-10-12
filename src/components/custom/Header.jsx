@@ -1,8 +1,10 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { FcGoogle } from "react-icons/fc";
+import { toast } from "sonner";
 import { LogOut, Map, Plus, UserRound } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+import { isGoogleSignInAvailable, useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import Logo from "./Logo";
 import ThemeToggle from "./ThemeToggle";
@@ -43,7 +45,7 @@ const navLinkClass = ({ isActive }) =>
   );
 
 function Header() {
-  const { user, logout, openSignIn } = useAuth();
+  const { user, ready, logout, openSignIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -84,11 +86,23 @@ function Header() {
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{user.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {user.guest ? "Trips saved on this device" : user.email}
+                      {user.guest ? "Guest · trips tied to this browser" : user.email}
                     </p>
                   </div>
                 </div>
                 <div className="my-1 h-px bg-border" />
+                {user.guest && isGoogleSignInAvailable && (
+                  <button
+                    onClick={() =>
+                      signInWithGoogle()
+                        .then((profile) => profile && toast.success("Signed in — your trips are now saved to your Google account."))
+                        .catch((error) => toast.error(error.message))
+                    }
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-muted"
+                  >
+                    <FcGoogle className="h-4 w-4" /> Save trips with Google
+                  </button>
+                )}
                 <button
                   onClick={() => navigate("/my-trips")}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-muted"
@@ -96,8 +110,15 @@ function Header() {
                   <Map className="h-4 w-4" /> My trips
                 </button>
                 <button
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    if (
+                      user.guest &&
+                      isGoogleSignInAvailable &&
+                      !window.confirm("Guest trips can't be recovered after signing out. Sign out anyway?")
+                    ) {
+                      return;
+                    }
+                    await logout();
                     navigate("/");
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10"
@@ -106,6 +127,8 @@ function Header() {
                 </button>
               </PopoverContent>
             </Popover>
+          ) : !ready ? (
+            <span className="skeleton ml-1 h-9 w-9 rounded-full" aria-hidden />
           ) : (
             <Button variant="ghost" className="h-10 rounded-full px-4 font-semibold" onClick={openSignIn}>
               Sign in

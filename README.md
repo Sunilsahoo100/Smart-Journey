@@ -18,8 +18,8 @@ Trips are saved to **My Trips** and can be shared, printed or deleted.
 | Destination search | [Photon](https://photon.komoot.io) (OpenStreetMap data) | Free, no key |
 | Maps | [Leaflet](https://leafletjs.com) + OpenStreetMap tiles | Free, no key |
 | Place photos | Wikipedia API | Free, no key |
-| Sign-in (optional) | Google OAuth (`@react-oauth/google`) or guest mode | Free |
-| Storage (optional) | Firebase Firestore, with localStorage fallback | Free tier |
+| Sign-in | Firebase Authentication (Google + anonymous guests) | Free (Spark) |
+| Storage | Firebase Firestore, with a localStorage copy | Free (Spark) |
 
 The old Google Places API (which needs a billing account) has been removed completely.
 
@@ -37,8 +37,18 @@ npm run dev             # http://localhost:5173
 | --- | --- | --- |
 | `VITE_GEMINI_API_KEY` | **Yes** | Free key from [Google AI Studio](https://aistudio.google.com/app/apikey). |
 | `VITE_GEMINI_MODEL` | No | Defaults to `gemini-flash-latest`, with automatic fallback to other Flash models. |
-| `VITE_GOOGLE_AUTH_CLIENT_ID` | No | Enables "Continue with Google". Add `http://localhost:5173` and your deployed URL to the OAuth client's *Authorized JavaScript origins*. Without it, users continue as guests. |
-| `VITE_FIREBASE_*` | No | Enables cloud sync in Firestore (collection `AItrips`). Without it, trips are kept in the browser's localStorage. |
+| `VITE_FIREBASE_*` | Recommended | Web app config from the Firebase console. Enables Google sign-in and cloud sync. Without it the app runs in local-only guest mode. |
+
+### Firebase setup
+
+1. In the [Firebase console](https://console.firebase.google.com), add a **Web app** and copy its config into `.env`.
+2. **Firestore** → Create database (production mode).
+3. **Firestore → Rules**: paste the contents of [`firestore.rules`](firestore.rules) and publish
+   (or `npx firebase-tools deploy --only firestore:rules`).
+4. **Authentication → Sign-in method**: enable **Google** and **Anonymous**.
+5. **Authentication → Settings → Authorized domains**: add your deployed domain (localhost is allowed by default).
+
+Security model: users can only list, create and delete their own trips; anyone with a trip's (random UUID) link can view it, so sharing works.
 
 > **Note:** this is a client-only app, so the Gemini key ships to the browser. Restrict the key to your domains in Google Cloud Console (*API key → Application restrictions → Websites*) before deploying publicly.
 
@@ -55,7 +65,8 @@ npm run dev             # http://localhost:5173
 src/
   App.jsx                     layout (header, footer, toaster, auth)
   main.jsx                    routes
-  context/AuthContext.jsx     Google / guest sign-in
+  context/AuthContext.jsx     Firebase Google / anonymous guest sign-in
+  context/ThemeContext.jsx    light / dark / system theme
   service/
     AIModel.js                Gemini prompt + JSON schema + model fallback
     GlobalApi.js              Photon search, Wikipedia photos, map links

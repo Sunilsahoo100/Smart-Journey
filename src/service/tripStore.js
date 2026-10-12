@@ -1,7 +1,7 @@
 // Trip persistence. Uses Firestore when configured and always keeps a copy in
 // localStorage, so the app works offline and without any Firebase setup.
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { auth, db } from "./firebaseConfig";
 
 const COLLECTION = "AItrips";
 const LOCAL_KEY = "sj:trips:v1";
@@ -36,12 +36,18 @@ function withTimeout(promise) {
 const createdTime = (trip) => trip.createdAt ?? (Number(trip.id) || 0);
 const byNewest = (a, b) => createdTime(b) - createdTime(a);
 
+// Cloud writes need a signed-in Firebase user (see firestore.rules).
+const canUseCloud = () => Boolean(db && auth?.currentUser);
+
+const ownedBy = (trip, user) =>
+  trip.userId ? trip.userId === user.uid : Boolean(user.email) && trip.userEmail === user.email;
+
 /** Saves a trip. Resolves to { cloud: boolean } telling where it was stored. */
 export async function saveTrip(input) {
   // Firestore rejects `undefined` values; a JSON round-trip drops them.
   const trip = JSON.parse(JSON.stringify(input));
   writeLocal({ ...readLocal(), [trip.id]: trip });
-  if (!db) return { cloud: false };
+  if (!canUseCloud()) return { cloud: false };
   try {
     await withTimeout(setDoc(doc(db, COLLECTION, trip.id), trip));
     return { cloud: true };
@@ -59,17 +65,17 @@ export async function getTrip(id) {
   return snapshot.exists() ? snapshot.data() : null;
 }
 
-export async function getUserTrips(email) {
+export async function getUserTrips(user) {
   const trips = new Map(
     Object.values(readLocal())
-      .filter((trip) => trip.userEmail === email)
+      .filter((trip) => ownedBy(trip, user))
       .map((trip) => [trip.id, trip])
   );
 
-  if (db && email) {
+  if (canUseCloud()) {
     try {
       const snapshot = await withTimeout(
-        getDocs(query(collection(db, COLLECTION), where("userEmail", "==", email)))
+        getDocs(query(collection(db, COLLECTION), where("userId", "==", user.uid)))
       );
       snapshot.forEach((d) => trips.set(d.id, { id: d.id, ...d.data() }));
     } catch (error) {
@@ -83,5 +89,5 @@ export async function deleteTrip(id) {
   const local = readLocal();
   delete local[id];
   writeLocal(local);
-  if (db) await withTimeout(deleteDoc(doc(db, COLLECTION, id)));
+  if (canUseCloud()) await withTimeout(deleteDoc(doc(db, COLLECTION, id)));
 }

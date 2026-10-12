@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// SmartJourney security rules.
+// Paste into Firebase console → Firestore → Rules, or run `firebase deploy --only firestore:rules`.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /AItrips/{tripId} {
+      function signedIn() {
+        return request.auth != null;
+      }
+      function isOwner() {
+        return signedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      // Anyone with a trip's link can open it (trip ids are long and random),
+      // which keeps the Share button working.
+      allow get: if true;
+
+      // Listing ("My trips") only returns your own trips.
+      allow list: if isOwner();
+
+      // You can only create trips for yourself, with the expected shape.
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.id == tripId
+        && request.resource.data.keys().hasAll(['id', 'userId', 'userSelection', 'tripData', 'createdAt'])
+        && request.resource.data.tripData is map
+        && request.resource.data.userSelection is map;
+
+      // Trips are immutable once generated; owners can delete them.
+      allow update: if false;
+      allow delete: if signedIn() && (resource == null || isOwner());
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
