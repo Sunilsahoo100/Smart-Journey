@@ -1,0 +1,62 @@
+import { BedDouble, ExternalLink, MapPin, Navigation, Star } from "lucide-react";
+import PlaceImage from "@/components/custom/PlaceImage";
+import { bookingSearchUrl, googleMapsSearchUrl } from "@/service/GlobalApi";
+
+function HotelCardItem({ hotel, locationName, onShowOnMap }) {
+  return (
+    <article className="card-surface group flex flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-lift">
+      <PlaceImage name={hotel.name} context={locationName} size={700} icon={BedDouble} className="h-44">
+        {hotel.rating > 0 && (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-card/95 px-2.5 py-1 text-xs font-bold text-card-foreground shadow">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {hotel.rating.toFixed(1)}
+          </span>
+        )}
+        {hotel.price && (
+          <span className="absolute bottom-3 right-3 max-w-[80%] truncate rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+            {hotel.price}
+          </span>
+        )}
+      </PlaceImage>
+
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="font-bold leading-snug">{hotel.name}</h3>
+        {hotel.address && (
+          <p className="mt-1 flex gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {hotel.address}
+          </p>
+        )}
+        {hotel.description && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{hotel.description}</p>}
+
+        <div className="mt-auto flex flex-wrap gap-2 pt-4 print:hidden">
+          {hotel.coords && (
+            <button
+              type="button"
+              onClick={() => onShowOnMap(hotel)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
+            >
+              <Navigation className="h-3.5 w-3.5" /> Show on map
+            </button>
+          )}
+          <a
+            href={bookingSearchUrl(hotel.name, locationName)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:border-primary/40 hover:text-primary"
+          >
+            Check prices <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href={googleMapsSearchUrl(hotel.name, hotel.address || locationName)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:border-primary/40 hover:text-primary"
+          >
+            Google Maps <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default HotelCardItem;
