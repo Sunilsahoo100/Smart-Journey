@@ -7,7 +7,13 @@ Plan personalised trips with AI. Pick a destination, the number of days, your bu
 - an **interactive map** (OpenStreetMap + Leaflet) with numbered, colour-coded stops and routes per day
 - a trip **overview** with best season, estimated cost and local tips
 
-Trips are saved to **My Trips** and can be shared, printed or deleted.
+After generating, you can **customize** the plan: reorder or move stops between days, edit details, add your own places and notes, add or remove days and hotels, or ask the AI to **re-plan a single day** ("more street food, relaxed pace"). Trips are saved to **My Trips** and can be shared, printed, copied or deleted. Light and dark themes are included.
+
+![SmartJourney home page with a live sample map of Paris](docs/screenshots/home.jpg)
+
+| Trip overview | Itinerary & interactive map |
+| --- | --- |
+| ![Trip overview for Bhubaneswar with summary, best time to visit and estimated cost](docs/screenshots/trip-overview.jpg) | ![Day-by-day itinerary next to a map with colour-coded stops per day](docs/screenshots/itinerary-map.jpg) |
 
 ## Tech stack
 

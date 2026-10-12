@@ -42,7 +42,7 @@ const canUseCloud = () => Boolean(db && auth?.currentUser);
 const ownedBy = (trip, user) =>
   trip.userId ? trip.userId === user.uid : Boolean(user.email) && trip.userEmail === user.email;
 
-/** Saves a trip. Resolves to { cloud: boolean } telling where it was stored. */
+/** Creates or overwrites a trip. Resolves to { cloud: boolean } telling where it was stored. */
 export async function saveTrip(input) {
   // Firestore rejects `undefined` values; a JSON round-trip drops them.
   const trip = JSON.parse(JSON.stringify(input));
@@ -53,16 +53,40 @@ export async function saveTrip(input) {
     return { cloud: true };
   } catch (error) {
     console.warn("Cloud save failed, trip kept on this device", error);
-    return { cloud: false, error };
+    return { cloud: false, error, reason: cloudErrorReason(error) };
   }
 }
 
+/** Human-readable cause for a failed cloud write (shown in the sync warning). */
+export function cloudErrorReason(error) {
+  switch (error?.code) {
+    case "permission-denied":
+      return "Firestore rules rejected the save. Publish the latest firestore.rules in the Firebase console.";
+    case "unauthenticated":
+      return "You're not signed in to Firebase. Sign in again and retry.";
+    case "unavailable":
+      return "Firestore is unreachable — check your connection.";
+    case "not-found":
+    case "failed-precondition":
+      return "The Firestore database isn't set up for this project yet.";
+    default:
+      return /timed out/i.test(error?.message ?? "") ? "Firestore didn't respond in time." : error?.message ?? "";
+  }
+}
+
+/** Loads a trip, preferring the cloud copy (it may have been edited elsewhere). */
 export async function getTrip(id) {
   const local = readLocal()[id];
-  if (local) return local;
-  if (!db) return null;
-  const snapshot = await withTimeout(getDoc(doc(db, COLLECTION, id)));
-  return snapshot.exists() ? snapshot.data() : null;
+  if (db) {
+    try {
+      const snapshot = await withTimeout(getDoc(doc(db, COLLECTION, id)));
+      if (snapshot.exists()) return snapshot.data();
+    } catch (error) {
+      if (!local) throw error;
+      console.warn("Cloud load failed, using this device's copy", error);
+    }
+  }
+  return local ?? null;
 }
 
 export async function getUserTrips(user) {

@@ -47,7 +47,10 @@ export function parseCoordinates(value) {
 
 function normalizeHotel(h, i) {
   return {
-    key: `hotel-${i}`,
+    key: h.uid ?? `hotel-${i}`,
+    uid: h.uid,
+    custom: Boolean(h.custom),
+    notes: h.userNotes ?? "",
     name: h.hotelName ?? h.name ?? h.HotelName ?? "Hotel",
     address: h.hotelAddress ?? h.address ?? h.HotelAddress ?? "",
     price: h.price ?? h.Price ?? "",
@@ -59,7 +62,10 @@ function normalizeHotel(h, i) {
 
 function normalizePlace(p, dayIndex, i) {
   return {
-    key: `d${dayIndex}-p${i}`,
+    key: p.uid ?? `d${dayIndex}-p${i}`,
+    uid: p.uid,
+    custom: Boolean(p.custom),
+    notes: p.userNotes ?? "",
     dayIndex,
     order: i + 1,
     time: p.time ?? p.bestTimeToVisit ?? "",
@@ -100,7 +106,7 @@ export function normalizeTrip(raw) {
       name: cleanPlaceName(location.name) || label.split(",")[0].trim(),
       coords: locationCoords,
     },
-    noOfDays: Number(selection.noOfDays) || itinerary.length,
+    noOfDays: itinerary.length || Number(selection.noOfDays) || 0,
     budget: selection.budget ?? "",
     traveler: selection.traveler ?? "",
     interests: selection.interests ?? [],
@@ -111,6 +117,7 @@ export function normalizeTrip(raw) {
     hotels: (data.hotelOptions ?? data.hotels ?? []).map(normalizeHotel),
     days: itinerary.map((day, dayIndex) => ({
       day: Number(day.day) || dayIndex + 1,
+      uid: day.uid,
       dayIndex,
       theme: day.theme ?? "",
       places: (day.plan ?? day.places ?? day.activities ?? []).map((p, i) => normalizePlace(p, dayIndex, i)),

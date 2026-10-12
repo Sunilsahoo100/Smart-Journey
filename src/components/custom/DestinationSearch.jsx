@@ -8,7 +8,15 @@ import { cn } from "@/lib/utils";
  * `value` is the selected place object (or null); `onChange` receives the
  * newly selected place or null when the user edits the text.
  */
-function DestinationSearch({ value, onChange, placeholder = "Search a city, region or country…", autoFocus, className, inputClassName }) {
+function DestinationSearch({
+  value,
+  onChange,
+  search = searchDestinations,
+  placeholder = "Search a city, region or country…",
+  autoFocus,
+  className,
+  inputClassName,
+}) {
   const [query, setQuery] = useState(value?.label ?? "");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -32,7 +40,7 @@ function DestinationSearch({ value, onChange, placeholder = "Search a city, regi
     const controller = new AbortController();
     setLoading(true);
     const timer = setTimeout(() => {
-      searchDestinations(query, { signal: controller.signal })
+      search(query, { signal: controller.signal })
         .then((places) => {
           setResults(places);
           setHighlight(0);
@@ -49,7 +57,7 @@ function DestinationSearch({ value, onChange, placeholder = "Search a city, regi
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, value?.label]);
+  }, [query, value?.label, search]);
 
   useEffect(() => {
     const onPointerDown = (e) => {

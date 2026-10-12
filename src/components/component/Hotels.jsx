@@ -1,8 +1,8 @@
-import { BedDouble } from "lucide-react";
+import { BedDouble, Plus } from "lucide-react";
 import HotelCardItem from "./HotelCardItem";
 
-function Hotels({ trip, onShowOnMap }) {
-  if (!trip.hotels.length) return null;
+function Hotels({ trip, onShowOnMap, editing, editor }) {
+  if (!trip.hotels.length && !editing) return null;
 
   return (
     <section className="mt-12">
@@ -17,8 +17,24 @@ function Hotels({ trip, onShowOnMap }) {
       </div>
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
         {trip.hotels.map((hotel) => (
-          <HotelCardItem key={hotel.key} hotel={hotel} locationName={trip.location.name} onShowOnMap={onShowOnMap} />
+          <HotelCardItem
+            key={hotel.key}
+            hotel={hotel}
+            locationName={trip.location.name}
+            onShowOnMap={onShowOnMap}
+            editing={editing}
+            editor={editor}
+          />
         ))}
+        {editing && (
+          <button
+            type="button"
+            onClick={editor.addHotel}
+            className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed text-sm font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+          >
+            <Plus className="h-6 w-6" /> Add your own hotel
+          </button>
+        )}
       </div>
     </section>
   );

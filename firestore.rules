@@ -28,8 +28,12 @@ service cloud.firestore {
         && request.resource.data.tripData is map
         && request.resource.data.userSelection is map;
 
-      // Trips are immutable once generated; owners can delete them.
-      allow update: if false;
+      // Owners can customise their trips, but not hand them to someone else.
+      allow update: if isOwner()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.tripData is map
+        && request.resource.data.userSelection is map;
       allow delete: if signedIn() && (resource == null || isOwner());
     }
 

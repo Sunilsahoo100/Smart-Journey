@@ -108,7 +108,7 @@ function CreateTrip() {
       const tripData = await generateTrip(prompt);
       // Unguessable id: anyone with the link can view a trip (see firestore.rules).
       const id = crypto.randomUUID();
-      const { cloud } = await saveTrip({
+      const { cloud, reason } = await saveTrip({
         id,
         createdAt: Date.now(),
         userId: user.uid,
@@ -129,7 +129,10 @@ function CreateTrip() {
         tripData,
       });
       if (isFirebaseConfigured && !cloud) {
-        toast.warning("Cloud sync failed, so the trip was saved on this device only.");
+        toast.warning("Cloud sync failed, so the trip was saved on this device only.", {
+          description: reason,
+          duration: 10000,
+        });
       }
       toast.success("Your trip is ready! 🎉");
       navigate(`/view-trip/${id}`);

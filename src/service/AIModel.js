@@ -31,6 +31,33 @@ const coordinates = {
 
 // Field names match the format saved by earlier versions of the app so old
 // trips keep rendering.
+const DAY_SCHEMA = {
+  type: "object",
+  properties: {
+    day: { type: "integer" },
+    theme: { type: "string", description: "Short title for the day, e.g. 'Old Town & Riverside'." },
+    plan: {
+      type: "array",
+      minItems: 3,
+      maxItems: 5,
+      items: {
+        type: "object",
+        properties: {
+          time: { type: "string", description: "e.g. 'Morning (9:00 AM – 11:30 AM)'." },
+          placeName: { type: "string" },
+          placeDetails: { type: "string" },
+          ticketPricing: { type: "string" },
+          rating: { type: "number" },
+          timeTravel: { type: "string", description: "Travel time from the previous stop." },
+          geoCoordinates: coordinates,
+        },
+        required: ["time", "placeName", "placeDetails", "ticketPricing", "rating", "timeTravel", "geoCoordinates"],
+      },
+    },
+  },
+  required: ["day", "theme", "plan"],
+};
+
 const TRIP_SCHEMA = {
   type: "object",
   properties: {
@@ -56,32 +83,7 @@ const TRIP_SCHEMA = {
     },
     itinerary: {
       type: "array",
-      items: {
-        type: "object",
-        properties: {
-          day: { type: "integer" },
-          theme: { type: "string", description: "Short title for the day, e.g. 'Old Town & Riverside'." },
-          plan: {
-            type: "array",
-            minItems: 3,
-            maxItems: 5,
-            items: {
-              type: "object",
-              properties: {
-                time: { type: "string", description: "e.g. 'Morning (9:00 AM – 11:30 AM)'." },
-                placeName: { type: "string" },
-                placeDetails: { type: "string" },
-                ticketPricing: { type: "string" },
-                rating: { type: "number" },
-                timeTravel: { type: "string", description: "Travel time from the previous stop." },
-                geoCoordinates: coordinates,
-              },
-              required: ["time", "placeName", "placeDetails", "ticketPricing", "rating", "timeTravel", "geoCoordinates"],
-            },
-          },
-        },
-        required: ["day", "theme", "plan"],
-      },
+      items: DAY_SCHEMA,
     },
     travelTips: {
       type: "array",
@@ -139,8 +141,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // moving on to the next model.
 const isTransient = (error) => error?.status === 429 || error?.status >= 500;
 
-/** Generates a structured trip plan. Returns the parsed JSON object. */
-export async function generateTrip(prompt) {
+/** Calls Gemini for JSON matching `schema`, with retries and model fallback. */
+async function generateStructured(prompt, schema, validate) {
   const ai = await getClient();
   let lastError;
 
@@ -153,12 +155,12 @@ export async function generateTrip(prompt) {
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             responseMimeType: "application/json",
-            responseJsonSchema: TRIP_SCHEMA,
+            responseJsonSchema: schema,
           },
         });
-        const trip = parseJson(response.text);
-        if (!trip?.itinerary?.length) throw new Error("The AI returned an empty itinerary.");
-        return trip;
+        const result = parseJson(response.text);
+        validate(result);
+        return result;
       } catch (error) {
         lastError = error;
         console.warn(`[Gemini] ${model} attempt ${attempt} failed:`, error?.status, error?.message);
@@ -172,4 +174,47 @@ export async function generateTrip(prompt) {
     }
   }
   throw friendlyError(lastError);
+}
+
+/** Generates a structured trip plan. Returns the parsed JSON object. */
+export function generateTrip(prompt) {
+  return generateStructured(prompt, TRIP_SCHEMA, (trip) => {
+    if (!trip?.itinerary?.length) throw new Error("The AI returned an empty itinerary.");
+  });
+}
+
+/**
+ * Re-plans a single day of an existing trip, following the user's instruction
+ * and avoiding places already planned on other days. Returns { theme, plan }.
+ */
+export async function regenerateDay({ trip, dayIndex, instruction }) {
+  const selection = trip.userSelection ?? {};
+  const days = trip.tripData.itinerary;
+  const current = days[dayIndex];
+  const elsewhere = days
+    .filter((_, i) => i !== dayIndex)
+    .flatMap((d) => d.plan.map((p) => p.placeName))
+    .filter(Boolean);
+  const hotels = (trip.tripData.hotelOptions ?? []).map((h) => h.hotelName).filter(Boolean);
+
+  const prompt = [
+    `Destination: ${selection.location?.label}.`,
+    `Travellers: ${selection.traveler || "not specified"}. Budget: ${selection.budget || "not specified"}.`,
+    selection.interests?.length ? `Interests: ${selection.interests.join(", ")}.` : "",
+    `This is day ${dayIndex + 1} of a ${days.length}-day trip.`,
+    hotels.length ? `They are staying at: ${hotels.join(", ")}.` : "",
+    elsewhere.length ? `Already planned on other days (do NOT repeat these): ${elsewhere.join("; ")}.` : "",
+    current?.plan?.length
+      ? `Current plan for this day: ${current.plan.map((p) => `${p.placeName} (${p.time})`).join("; ")}.`
+      : "This day currently has no stops.",
+    `Traveller's request: "${instruction?.trim() || "Suggest a fresh alternative plan for this day."}"`,
+    `Return a new plan for day ${dayIndex + 1} only: a short theme and 3–5 places in visiting order with times, details, ticket pricing, rating, travel time from the previous stop and accurate coordinates.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await generateStructured(prompt, DAY_SCHEMA, (day) => {
+    if (!day?.plan?.length) throw new Error("The AI returned an empty day plan.");
+  });
+  return { theme: result.theme ?? "", plan: result.plan };
 }

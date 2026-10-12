@@ -52,6 +52,52 @@ export async function searchDestinations(query, { signal } = {}) {
     .slice(0, 7);
 }
 
+/**
+ * Search any place — attractions, restaurants, hotels, streets — biased
+ * towards `near` ({ lat, lng }) so results around the trip come first.
+ */
+export async function searchPlacesNear(query, { near, signal } = {}) {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const params = new URLSearchParams({ q, limit: "8", lang: "en" });
+  if (near) {
+    params.set("lat", String(near.lat));
+    params.set("lon", String(near.lng));
+    params.set("zoom", "12"); // favour results within roughly a city's reach
+    params.set("location_bias_scale", "0.1");
+  }
+
+  const res = await fetch(`${PHOTON_URL}?${params}`, { signal });
+  if (!res.ok) throw new Error(`Place search failed (${res.status})`);
+  const data = await res.json();
+
+  const seen = new Set();
+  return (data.features ?? [])
+    .map((feature) => {
+      const p = feature.properties ?? {};
+      const [lon, lat] = feature.geometry?.coordinates ?? [];
+      const name = p.name ?? p.street ?? p.city ?? "";
+      const street = p.street ? [p.housenumber, p.street].filter(Boolean).join(" ") : "";
+      const parts = [name, street, p.city ?? p.county, p.country].filter(
+        (part, i, all) => part && all.indexOf(part) === i
+      );
+      return {
+        id: `${p.osm_type ?? ""}${p.osm_id ?? Math.random()}`,
+        name,
+        label: parts.join(", "),
+        country: p.country ?? "",
+        type: (p.osm_value ?? p.type ?? "place").replaceAll("_", " "),
+        lat,
+        lon,
+      };
+    })
+    .filter((place) => {
+      if (!place.name || seen.has(place.label)) return false;
+      seen.add(place.label);
+      return true;
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Place photos (Wikipedia)
 // ---------------------------------------------------------------------------

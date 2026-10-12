@@ -40,7 +40,7 @@ function Stat({ icon: Icon, label, value }) {
   );
 }
 
-function InfoSection({ trip }) {
+function InfoSection({ trip, actions }) {
   const { location } = trip;
   const country = location.label.split(",").at(-1)?.trim();
   const title = `${trip.noOfDays}-day trip to ${location.name}`;
@@ -55,7 +55,8 @@ function InfoSection({ trip }) {
         className="h-[300px] rounded-3xl shadow-lift md:h-[400px]"
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-        <div className="absolute right-4 top-4 flex gap-2 print:hidden">
+        <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2 print:hidden">
+          {actions}
           <Button size="sm" variant="secondary" className="rounded-full bg-card/90 text-foreground backdrop-blur hover:bg-card" onClick={() => window.print()}>
             <Printer /> <span className="hidden sm:inline">Print</span>
           </Button>
